@@ -3,9 +3,9 @@
 		"module": "Node16",
 		"target": "ES2022",
 		"lib": [
-			"ES2022",
-			"dom"
+			"ES2022"
 		],
+		"outDir": "dist",
 		"sourceMap": true,
 		"rootDir": "src",
 		"strict": true,   /* enable all strict type-checking options */
