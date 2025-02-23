@@ -1,8 +1,13 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
-import ollama from 'ollama';
+// import ollama from 'ollama';
 import * as acorn from 'acorn';
 import * as ts from 'typescript';
+import Parser, { Language } from "tree-sitter";
+import Python from "tree-sitter-python";
+import { generateDocstrings } from './helper/open-ai';
+
+
 
 export const getActiveEditorContent = () => {
   const editor = vscode.window.activeTextEditor;
@@ -76,17 +81,9 @@ export const listenForEditorChanges = () => {
 
 async function generateComment(code: string) {
   try {
-    const response = await ollama.chat({
-      model: 'llama2:7b-chat',
-      messages: [
-        {
-          role: 'user',
-          content: `Generate a brief comment explaining this code:\n${code}`,
-        },
-      ],
-    });
+    console.log(code);
+    return generateDocstrings(code);
 
-    return response.message.content;
   } catch (error) {
     console.error('Error generating comment:', error);
     return null;
@@ -160,6 +157,13 @@ const getCodeAroundPosition = async (
         code = traverseJSAst(ast, document, position);
         console.log('code JS ---->', code);
         break;
+      case "python":
+        console.log('handling python code');
+        const parser = new Parser();
+        parser.setLanguage(Python as unknown as Language);
+        ast = parser.parse(document.getText());
+        code = traversePythonAst(ast, document, position);
+        break;
     }
 
     return code;
@@ -168,6 +172,7 @@ const getCodeAroundPosition = async (
     return null;
   }
 };
+
 
 const traverseJSAst = (
   ast: ts.SourceFile,
@@ -186,6 +191,9 @@ const traverseJSAst = (
       console.log('found node', node);
 
       foundNode = node;
+    } else {
+      console.log("Node not found");
+      return;
     }
   }
 
@@ -266,6 +274,44 @@ const traverseTSAst = (
   return document.lineAt(position.line).text;
 };
 
+const traversePythonAst = (
+  ast: Parser.Tree,
+  document: vscode.TextDocument,
+  position: vscode.Position
+): string => {
+  let foundNode: Parser.SyntaxNode | null = null;
+  const cursorOffset = document.offsetAt(position);
+
+  function traverse(node: Parser.SyntaxNode) {
+    if (node.startIndex <= cursorOffset && node.endIndex >= cursorOffset) {
+      foundNode = node as Parser.SyntaxNode; // Explicitly cast
+    }
+    for (const child of node.children) {
+      traverse(child);
+    }
+  }
+
+  traverse(ast.rootNode);
+
+  while (
+    foundNode !== null &&
+    (foundNode as Parser.SyntaxNode).type &&
+    !["function_definition", "class_definition", "if_statement", "for_statement", "while_statement"].includes(
+      (foundNode as Parser.SyntaxNode).type
+    )
+  ) {
+    foundNode = (foundNode as Parser.SyntaxNode).parent ?? null;
+  }
+
+  return foundNode
+    ? document.getText(
+        new vscode.Range(
+          document.positionAt(foundNode.startIndex),
+          document.positionAt(foundNode.endIndex)
+        )
+      )
+    : document.lineAt(position.line).text;
+};
 export const insertComment = (comment: string, position: vscode.Position) => {
   const editor = vscode.window.activeTextEditor;
   if (editor) {
