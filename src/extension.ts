@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { generateCommentFromEditor, listenForEditorChanges } from './utils';
+import { generateCommentFromEditor, insertComment, listenForEditorChanges } from './utils';
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -19,10 +19,14 @@ export function activate(context: vscode.ExtensionContext) {
 		// Display a message box to the user
 		vscode.window.showInformationMessage('Hello World from extends!');
 	});
-	listenForEditorChanges();
+	const insertCommentCommand = vscode.commands.registerCommand('extends.insertComment', (comment, position) => {
+		insertComment(comment, position);
+});
+	// listenForEditorChanges();
 	generateCommentFromEditor();
 
 	context.subscriptions.push(disposable);
+	context.subscriptions.push(insertCommentCommand);
 }
 
 // This method is called when your extension is deactivated
