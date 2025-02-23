@@ -109,7 +109,7 @@ export function generateCommentFromEditor() {
         }
 
         const code = await getCodeAroundPosition(document, position);
-        const comment = await generateComment(code ?? '');
+        const comment = code ? await generateComment(code) : '';
         
         return [new vscode.InlineCompletionItem(comment ?? '')];
       }
