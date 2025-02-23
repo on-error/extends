@@ -47,6 +47,10 @@
   "dependencies": {
     "acorn": "^8.14.0",
     "axios": "^1.7.9",
-    "ollama": "^0.5.13"
+    "ollama": "^0.5.13",
+    "openai": "^4.85.4",
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-python": "^0.23.6",
+    "vscode": "^1.1.37"
   }
 }
