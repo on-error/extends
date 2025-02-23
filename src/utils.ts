@@ -106,11 +106,22 @@ export function generateCommentFromEditor() {
         }
 
         const code = await getCodeAroundPosition(document, position);
+        console.log('generatecomment from editor --- > code ---> ', code);
         const comment = code ? await generateComment(code) : '';
-        console.log('comment',comment);
-        
-        return [new vscode.InlineCompletionItem(comment ?? '')];
-      }
+        console.log('generatecomment from editor --- > comment ---> ', comment);
+
+        return [
+          {
+            insertText: ` // ${comment}`,
+            range: new vscode.Range(position, position),
+            command: {
+              title: 'Insert Comment',
+              command: 'extends.insertComment',
+              arguments: [comment, position],
+            },
+          },
+        ];
+      },
     }
   );
 }
@@ -120,7 +131,7 @@ const getCodeAroundPosition = async (
   position: vscode.Position
 ) => {
   const languageId = document.languageId;
-
+  console.log('LanguageId', languageId);
   try {
     let ast: any;
     let code = '';
@@ -133,6 +144,7 @@ const getCodeAroundPosition = async (
           ts.ScriptTarget.Latest,
           true
         );
+        console.log('TS AST ---> ', ast);
         code = traverseTSAst(ast, document, position);
         break;
       case 'javascript':
@@ -140,7 +152,10 @@ const getCodeAroundPosition = async (
           sourceType: 'module',
           ecmaVersion: 'latest',
         });
+        console.log('JS AST ---> ', ast);
+
         code = traverseJSAst(ast, document, position);
+        console.log('code JS ---->', code);
         break;
       case "python":
         console.log('handling python code');
@@ -150,6 +165,8 @@ const getCodeAroundPosition = async (
         code = traversePythonAst(ast, document, position);
         break;
     }
+
+    return code;
   } catch (error) {
     console.error('Error getting code around position:', error);
     return null;
@@ -165,11 +182,14 @@ const traverseJSAst = (
   let foundNode: any = null;
   function traverse(node: any, position: vscode.Position) {
     if (node.type === 'Program' || node.type === 'BlockStatement') {
+      console.log('traverse node', node);
       node.body.forEach((child: any) => traverse(child, position));
     } else if (
       node.start <= document.offsetAt(position) &&
       node.end >= document.offsetAt(position)
     ) {
+      console.log('found node', node);
+
       foundNode = node;
     } else {
       console.log("Node not found");
@@ -183,8 +203,13 @@ const traverseJSAst = (
     while (contextNode.type !== 'FunctionDeclaration') {
       contextNode = contextNode.parent;
     }
-
-    if (contextNode.type === 'FunctionDeclaration' || contextNode.type === 'IfStatement' || contextNode.type === 'WhileStatement' || contextNode.type === 'ForStatement') {
+    console.log('contextNode', contextNode);
+    if (
+      contextNode.type === 'FunctionDeclaration' ||
+      contextNode.type === 'IfStatement' ||
+      contextNode.type === 'WhileStatement' ||
+      contextNode.type === 'ForStatement'
+    ) {
       return document.getText(
         new vscode.Range(
           document.positionAt(contextNode.start),
@@ -205,10 +230,12 @@ const traverseTSAst = (
   position: vscode.Position
 ) => {
   let foundNode: ts.Node | undefined;
-  
+
   function visit(node: ts.Node) {
-    if (document.offsetAt(position) >= node.getStart() && 
-        document.offsetAt(position) <= node.getEnd()) {
+    if (
+      document.offsetAt(position) >= node.getStart() &&
+      document.offsetAt(position) <= node.getEnd()
+    ) {
       foundNode = node;
     }
     ts.forEachChild(node, visit);
@@ -218,17 +245,21 @@ const traverseTSAst = (
 
   if (foundNode) {
     let contextNode: ts.Node = foundNode;
-    while (contextNode.parent && 
-           !ts.isFunctionDeclaration(contextNode) &&
-           !ts.isMethodDeclaration(contextNode)) {
+    while (
+      contextNode.parent &&
+      !ts.isFunctionDeclaration(contextNode) &&
+      !ts.isMethodDeclaration(contextNode)
+    ) {
       contextNode = contextNode.parent;
     }
 
-    if (ts.isFunctionDeclaration(contextNode) || 
-        ts.isMethodDeclaration(contextNode) ||
-        ts.isIfStatement(contextNode) ||
-        ts.isWhileStatement(contextNode) ||
-        ts.isForStatement(contextNode)) {
+    if (
+      ts.isFunctionDeclaration(contextNode) ||
+      ts.isMethodDeclaration(contextNode) ||
+      ts.isIfStatement(contextNode) ||
+      ts.isWhileStatement(contextNode) ||
+      ts.isForStatement(contextNode)
+    ) {
       return document.getText(
         new vscode.Range(
           document.positionAt(contextNode.getStart()),
@@ -239,7 +270,7 @@ const traverseTSAst = (
       return document.lineAt(position.line).text;
     }
   }
-  
+
   return document.lineAt(position.line).text;
 };
 
@@ -280,4 +311,12 @@ const traversePythonAst = (
         )
       )
     : document.lineAt(position.line).text;
+};
+export const insertComment = (comment: string, position: vscode.Position) => {
+  const editor = vscode.window.activeTextEditor;
+  if (editor) {
+    editor.edit((editBuilder) => {
+      editBuilder.insert(position, `//${comment}`);
+    });
+  }
 };
