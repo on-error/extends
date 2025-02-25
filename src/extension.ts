@@ -55,22 +55,37 @@ export function activate(context: vscode.ExtensionContext) {
   // );
   // context.subscriptions.push(generatedCommentCommand);
 
-	outputChannel = vscode.window.createOutputChannel('My Extension');
+	// outputChannel = vscode.window.createOutputChannel('My Extension');
+  //   outputChannel.appendLine('Extension activated!');
+
+  //   context.subscriptions.push(
+  //       vscode.languages.registerInlineCompletionItemProvider({ pattern: '**' }, {
+  //           provideInlineCompletionItems: () => {
+  //               outputChannel.appendLine('Inline completion triggered!');
+	// 							console.log('Inline completion triggered');
+  //               return [{
+  //                   insertText: '// Test comment\n',
+  //                   range: new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, 0)),
+  //               }];
+  //           },
+  //       })
+  //   );
+
+  const outputChannel = vscode.window.createOutputChannel('My Extension');
     outputChannel.appendLine('Extension activated!');
 
     context.subscriptions.push(
         vscode.languages.registerInlineCompletionItemProvider({ pattern: '**' }, {
-            provideInlineCompletionItems: () => {
+            provideInlineCompletionItems: (document, position, context, token) => {
                 outputChannel.appendLine('Inline completion triggered!');
-								console.log('Inline completion triggered');
-                return [{
-                    insertText: '// Test comment\n',
-                    range: new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, 0)),
-                }];
-            },
+                console.log('Inline completion triggered');
+
+                return new vscode.InlineCompletionList([
+                    new vscode.InlineCompletionItem('// Test comment', new vscode.Range(position, position))
+                ]);
+            }
         })
     );
-
 }
 
 // This method is called when your extension is deactivated

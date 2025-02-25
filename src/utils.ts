@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
-import ollama from 'ollama';
+// import ollama from 'ollama';``
 import * as acorn from 'acorn';
 import * as ts from 'typescript';
 import Parser, { Language } from 'tree-sitter';
@@ -82,18 +82,18 @@ async function generateComment(code: string) {
     // console.log(code);
     // return generateDocstrings(code);
 
-    const response = await ollama.chat({
-      model: 'llama2:7b-chat',
-      messages: [
-        {
-          role: 'user',
-          content: `Generate a brief comment in less than 20 words explaining this code:\n${code}`,
-        },
-      ],
-    });
+    // const response = await ollama.chat({
+    //   model: 'llama2:7b-chat',
+    //   messages: [
+    //     {
+    //       role: 'user',
+    //       content: `Generate a brief comment in less than 20 words explaining this code:\n${code}`,
+    //     },
+    //   ],
+    // });
 
-    console.log('response', response);
-    return response.message.content;
+    console.log('response', 'response');
+    return 'response.message.content';
   } catch (error) {
     console.error('Error generating comment:', error);
     return null;
@@ -155,7 +155,7 @@ async function generateComment(code: string) {
 // }
 
 export function generateCommentFromEditor() {
-  console.log('Generate comment from editor function called')
+  console.log('Generate comment from editor function called');
   return vscode.languages.registerInlineCompletionItemProvider(
     { pattern: '**' },
     {
