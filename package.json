@@ -16,6 +16,10 @@
       {
         "command": "extends.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "extends.generatedComment",
+        "title": "Comment"
       }
     ]
   },

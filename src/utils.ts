@@ -1,13 +1,11 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
-// import ollama from 'ollama';
+import ollama from 'ollama';
 import * as acorn from 'acorn';
 import * as ts from 'typescript';
-import Parser, { Language } from "tree-sitter";
-import Python from "tree-sitter-python";
+import Parser, { Language } from 'tree-sitter';
+import Python from 'tree-sitter-python';
 import { generateDocstrings } from './helper/open-ai';
-
-
 
 export const getActiveEditorContent = () => {
   const editor = vscode.window.activeTextEditor;
@@ -81,17 +79,84 @@ export const listenForEditorChanges = () => {
 
 async function generateComment(code: string) {
   try {
-    console.log(code);
-    return generateDocstrings(code);
+    // console.log(code);
+    // return generateDocstrings(code);
 
+    const response = await ollama.chat({
+      model: 'llama2:7b-chat',
+      messages: [
+        {
+          role: 'user',
+          content: `Generate a brief comment in less than 20 words explaining this code:\n${code}`,
+        },
+      ],
+    });
+
+    console.log('response', response);
+    return response.message.content;
   } catch (error) {
     console.error('Error generating comment:', error);
     return null;
   }
 }
 
+// export function generateCommentFromEditor() {
+//   return vscode.languages.registerInlineCompletionItemProvider(
+//     [
+//       { scheme: 'file', language: 'typescript' },
+//       { scheme: 'file', language: 'javascript' },
+//       { scheme: 'file', language: 'python' },
+//     ],
+//     {
+//       provideInlineCompletionItems: async (
+//         document: vscode.TextDocument,
+//         position: vscode.Position,
+//         context: vscode.InlineCompletionContext,
+//         token: vscode.CancellationToken
+//       ): Promise<vscode.InlineCompletionList> => {
+//         try {
+//           const line = document.lineAt(position.line);
+//           if (line.isEmptyOrWhitespace) {
+//             return new vscode.InlineCompletionList([]);
+//           }
+
+//           const code = await getCodeAroundPosition(document, position);
+//           console.log('generatecomment from editor --- > code ---> ', code);
+//           const comment = code ? await generateComment(code) : '';
+//           console.log(
+//             'generatecomment from editor --- > comment ---> ',
+//             comment
+//           );
+
+//           const completionItem = new vscode.InlineCompletionItem(
+//             ` // ${comment}`,
+//             new vscode.Range(
+//               position.with(position.line, 0),
+//               position.with(position.line, 0)
+//             )
+//           );
+
+//           console.log('Completion Item ---> ', completionItem);
+
+//           const completionList = new vscode.InlineCompletionList([
+//             completionItem,
+//           ]);
+
+//           console.log('Returning completion list');
+
+//           return completionList;
+//         } catch (error) {
+//           console.error('Error generating comment:', error);
+//           return new vscode.InlineCompletionList([]);
+//         }
+//       },
+//     }
+//   );
+// }
+
 export function generateCommentFromEditor() {
-  vscode.languages.registerInlineCompletionItemProvider(
+  console.log('Generate comment from editor function called')
+  return vscode.languages.registerInlineCompletionItemProvider(
     { pattern: '**' },
     {
       provideInlineCompletionItems: async (
@@ -99,28 +164,50 @@ export function generateCommentFromEditor() {
         position: vscode.Position,
         context: vscode.InlineCompletionContext,
         token: vscode.CancellationToken
-      ): Promise<vscode.InlineCompletionItem[]> => {
-        const line = document.lineAt(position.line);
-        if (line.isEmptyOrWhitespace) {
+      ) => {
+        try {
+          const line = document.lineAt(position.line);
+          if (line.isEmptyOrWhitespace) {
+            // return new vscode.InlineCompletionList([]);
+            return [];
+          }
+
+          const res = await getCodeAroundPosition(document, position);
+          const code = res?.code;
+          const startPosition = res?.startPostion;
+
+          console.log('generatecomment from editor --- > code ---> ', code);
+
+          if (!startPosition) {
+            return;
+          }
+
+          const indentation = document.lineAt(
+            startPosition.line
+          ).firstNonWhitespaceCharacterIndex;
+          const commentPosition = new vscode.Position(
+            startPosition.line,
+            indentation
+          );
+
+          // const comment = code ? await generateComment(code) : '';
+          const comment = 'Hardcoded comment';
+          console.log(
+            'generatecomment from editor --- > comment ---> ',
+            comment
+          );
+
+          return [
+            {
+              insertText: `${' '.repeat(indentation)}// ${comment}\n`,
+              range: new vscode.Range(commentPosition, commentPosition),
+            },
+          ];
+        } catch (error) {
+          console.error('Error generating comment:', error);
+          // return new vscode.InlineCompletionList([]);
           return [];
         }
-
-        const code = await getCodeAroundPosition(document, position);
-        console.log('generatecomment from editor --- > code ---> ', code);
-        const comment = code ? await generateComment(code) : '';
-        console.log('generatecomment from editor --- > comment ---> ', comment);
-
-        return [
-          {
-            insertText: ` // ${comment}`,
-            range: new vscode.Range(position, position),
-            command: {
-              title: 'Insert Comment',
-              command: 'extends.insertComment',
-              arguments: [comment, position],
-            },
-          },
-        ];
       },
     }
   );
@@ -135,6 +222,7 @@ const getCodeAroundPosition = async (
   try {
     let ast: any;
     let code = '';
+    let startPostion: vscode.Position | null = null;
 
     switch (languageId) {
       case 'typescript':
@@ -154,10 +242,12 @@ const getCodeAroundPosition = async (
         });
         console.log('JS AST ---> ', ast);
 
-        code = traverseJSAst(ast, document, position);
+        const res = traverseJSAst(ast, document, position);
+        code = res.code;
+        startPostion = res.startPos;
         console.log('code JS ---->', code);
         break;
-      case "python":
+      case 'python':
         console.log('handling python code');
         const parser = new Parser();
         parser.setLanguage(Python as unknown as Language);
@@ -166,13 +256,12 @@ const getCodeAroundPosition = async (
         break;
     }
 
-    return code;
+    return { code, startPostion };
   } catch (error) {
     console.error('Error getting code around position:', error);
     return null;
   }
 };
-
 
 const traverseJSAst = (
   ast: ts.SourceFile,
@@ -192,7 +281,7 @@ const traverseJSAst = (
 
       foundNode = node;
     } else {
-      console.log("Node not found");
+      console.log('Node not found');
       return;
     }
   }
@@ -210,18 +299,24 @@ const traverseJSAst = (
       contextNode.type === 'WhileStatement' ||
       contextNode.type === 'ForStatement'
     ) {
-      return document.getText(
-        new vscode.Range(
-          document.positionAt(contextNode.start),
-          document.positionAt(contextNode.end)
-        )
-      );
+      return {
+        code: document.getText(
+          new vscode.Range(
+            document.positionAt(contextNode.start),
+            document.positionAt(contextNode.end)
+          )
+        ),
+        startPos: document.positionAt(foundNode.start),
+      };
     } else {
-      return document.lineAt(position.line).text;
+      return {
+        code: document.lineAt(position.line).text,
+        startPos: document.positionAt(foundNode.start),
+      };
     }
   }
 
-  return document.lineAt(position.line).text;
+  return { code: document.lineAt(position.line).text, startPos: position };
 };
 
 const traverseTSAst = (
@@ -296,9 +391,13 @@ const traversePythonAst = (
   while (
     foundNode !== null &&
     (foundNode as Parser.SyntaxNode).type &&
-    !["function_definition", "class_definition", "if_statement", "for_statement", "while_statement"].includes(
-      (foundNode as Parser.SyntaxNode).type
-    )
+    ![
+      'function_definition',
+      'class_definition',
+      'if_statement',
+      'for_statement',
+      'while_statement',
+    ].includes((foundNode as Parser.SyntaxNode).type)
   ) {
     foundNode = (foundNode as Parser.SyntaxNode).parent ?? null;
   }
@@ -312,6 +411,7 @@ const traversePythonAst = (
       )
     : document.lineAt(position.line).text;
 };
+
 export const insertComment = (comment: string, position: vscode.Position) => {
   const editor = vscode.window.activeTextEditor;
   if (editor) {

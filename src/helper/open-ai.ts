@@ -3,7 +3,7 @@ import axios from "axios";
 const OPENAI_API_KEY = "";
 
 
-export const generateDocstrings = async (code: string): Promise<string> => {
+export const generateDocstrings = async (code: string) => {
     console.log('Generating coments for code');
     const prompt = `Add docstring-style comments to the following code:
     
